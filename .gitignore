@@ -1,0 +1,36 @@
+# Compiled output
+out/
+
+# Dependencies
+node_modules/
+
+# Packaged extension
+*.vsix
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code local settings
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.log
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Test results
+.nyc_output/
+coverage/
+
+.vscode-test/
