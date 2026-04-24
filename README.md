@@ -91,7 +91,6 @@ This extension has no configurable settings yet. Future versions may include opt
 
 ## Known Limitations
 
-- Date detection is heuristic-based (ISO 8601 format only)
 - Deeply nested objects reference sub-typedefs by name but do not auto-generate them
 - JSON arrays with mixed types default to `Array<any>`
 
@@ -106,7 +105,6 @@ Initial release:
 - Right-click context menu support
 - Default keybinding `Ctrl+Alt+J` / `Cmd+Alt+J`
 - Primitive type inference
-- ISO date string detection
 - Nested object and array support
 
 ## Contributing
