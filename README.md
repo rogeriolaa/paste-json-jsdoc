@@ -2,10 +2,6 @@
 
 Convert clipboard JSON into clean JSDoc `@typedef` definitions — right inside VS Code.
 
-![Version](https://img.shields.io/visual-studio-marketplace/v/n0n3br.n0n3br-paste-json-jsdoc)
-![Installs](https://img.shields.io/visual-studio-marketplace/i/n0n3br.n0n3br-paste-json-jsdoc)
-![License](https://img.shields.io/badge/license-MIT-blue)
-
 ## What It Does
 
 Stop writing JSDoc types manually. Copy a JSON object — from an API response, a config file, or a mock payload — run the command, and get a fully typed `@typedef` block inserted at your cursor.
