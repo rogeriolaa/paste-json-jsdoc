@@ -34,3 +34,6 @@ npm-debug.log*
 coverage/
 
 .vscode-test/
+# Article drafts & tooling
+medium-article.md
+make-hero.mjs
