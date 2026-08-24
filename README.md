@@ -44,6 +44,43 @@ Great for:
  */
 ```
 
+### Nested Objects and Arrays of Objects
+
+Nested structures get their own `@typedef` blocks — every referenced type actually exists, so IntelliSense resolves everything:
+
+```json
+{
+  "order": { "id": 7, "customer": { "name": "Ana" } },
+  "items": [{ "sku": "X1", "qty": 2 }],
+  "total": 49.9
+}
+```
+
+**Result** (name it `OrderResponse`):
+
+```javascript
+/**
+ * @typedef {object} OrderResponse
+ * @property {OrderResponse_Order} order
+ * @property {Array<OrderResponse_ItemsItem>} items
+ * @property {number} total - e.g:49.9
+ */
+/**
+ * @typedef {object} OrderResponse_Order
+ * @property {number} id - e.g:7
+ * @property {OrderResponse_Order_Customer} customer
+ */
+/**
+ * @typedef {object} OrderResponse_Order_Customer
+ * @property {string} name - e.g:"Ana"
+ */
+/**
+ * @typedef {object} OrderResponse_ItemsItem
+ * @property {string} sku - e.g:"X1"
+ * @property {number} qty - e.g:2
+ */
+```
+
 ## How to Run the Command
 
 ### Command Palette
@@ -116,14 +153,14 @@ VS Code supports installing extensions directly from a `.vsix` file through the 
 ## Features
 
 - ✅ Detects `string`, `number`, `boolean`, and `null` types
-- ✅ Handles nested objects with referenced sub-typedefs
+- ✅ Generates real sub-typedefs for nested objects and arrays of objects
 - ✅ Handles arrays of primitives and objects
 - ✅ Inserts output at the current cursor position
 - ✅ Works with any `.js`, `.ts`, or `.jsx` file
 
 ## Requirements
 
-- VS Code `1.74.0` or higher
+- VS Code `1.116.0` or higher
 - No additional dependencies required
 
 ## Extension Settings
@@ -132,15 +169,20 @@ This extension has no configurable settings yet. Future versions may include opt
 
 - Custom property comment format
 - Optional/required property markers
-- Automatic nested typedef generation
 
 ## Known Limitations
 
-- JSON has no native `Date` type, so date-like values are treated as strings by default [web:55].
-- Deeply nested objects reference sub-typedefs by name but do not auto-generate them
-- JSON arrays with mixed types may need manual adjustment after generation
+- JSON has no native `Date` type, so date-like values are treated as strings by default.
+- Arrays with mixed item types are typed from the first element and may need manual adjustment.
+- Property examples in comments are truncated to 50 characters.
 
 ## Release Notes
+
+### 0.1.0
+
+- **Fixed:** nested objects and arrays of objects now emit their referenced typedefs (previously generated references to types that did not exist)
+- Type names are sanitized to valid identifiers
+- Generator extracted to its own module; 14 tests run against the real code
 
 ### 0.0.1
 
