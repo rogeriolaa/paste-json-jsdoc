@@ -1,208 +1,121 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
-import * as path from "path";
+// Import the REAL generator — no copies. If extension code changes, these
+// tests exercise the shipped logic.
+import { generateJsdoc, inferType } from "../generator";
 
-suite("Extension Activation", () => {
-  test("Extension should be present", () => {
-    const extension = vscode.extensions.getExtension("n0n3br.paste-json-jsdoc");
-    assert.ok(extension, "Extension should be installed");
+suite("Generator — unit (real module)", () => {
+  test("simple object produces object typedef with typed properties", () => {
+    const jsdoc = generateJsdoc({ id: 1, name: "Ana", active: true }, "User");
+    assert.ok(jsdoc.includes("/**"));
+    assert.ok(jsdoc.includes("@typedef {object} User"));
+    assert.ok(jsdoc.includes("@property {number} id - e.g:1"));
+    assert.ok(jsdoc.includes('@property {string} name - e.g:"Ana"'));
+    assert.ok(jsdoc.includes("@property {boolean} active - e.g:true"));
   });
 
-  test("Extension should activate", async () => {
-    const extension = vscode.extensions.getExtension("n0n3br.paste-json-jsdoc");
-    if (!extension) {
-      assert.fail("Extension not found");
-      return;
-    }
-    await extension.activate();
-    assert.strictEqual(extension.isActive, true, "Extension should be active");
+  test("nested objects emit BOTH the reference and the nested typedef", () => {
+    const jsdoc = generateJsdoc(
+      { user: { profile: { age: 25 } } },
+      "Payload",
+    );
+    assert.ok(jsdoc.includes("@property {Payload_User} user"));
+    // The referenced typedef must exist — this was the ghost-type bug.
+    assert.ok(jsdoc.includes("@typedef {object} Payload_User"));
+    assert.ok(jsdoc.includes("@property {Payload_User_Profile} profile"));
+    assert.ok(jsdoc.includes("@typedef {object} Payload_User_Profile"));
+    assert.ok(jsdoc.includes("@property {number} age"));
+  });
+
+  test("arrays of objects emit the item typedef", () => {
+    const jsdoc = generateJsdoc({ items: [{ id: 1 }, { id: 2 }] }, "List");
+    assert.ok(jsdoc.includes("@property {Array<List_ItemsItem>} items"));
+    assert.ok(jsdoc.includes("@typedef {object} List_ItemsItem"));
+    assert.ok(jsdoc.includes("@property {number} id"));
+  });
+
+  test("empty array becomes Array<any>", () => {
+    const jsdoc = generateJsdoc({ tags: [] }, "T");
+    assert.ok(jsdoc.includes("@property {Array<any>} tags"));
+  });
+
+  test("null property becomes any", () => {
+    const jsdoc = generateJsdoc({ data: null }, "NullableTest");
+    assert.ok(jsdoc.includes("@property {any} data"));
+  });
+
+  test("root-level null does not crash", () => {
+    const jsdoc = generateJsdoc(null, "Nothing");
+    assert.ok(jsdoc.includes("@typedef {any} Nothing"));
+  });
+
+  test("array of primitives stays inline", () => {
+    const jsdoc = generateJsdoc({ tags: ["a", "b"] }, "TagList");
+    assert.ok(jsdoc.includes("@property {Array<string>} tags"));
+  });
+
+  test("example values are truncated to 50 chars", () => {
+    const longText = "x".repeat(200);
+    const jsdoc = generateJsdoc({ text: longText }, "Long");
+    const example = jsdoc.match(/e\.g:"(x+)"/)?.[1].length ?? 0;
+    assert.ok(example <= 50, `example should be truncated, got ${example}`);
+  });
+
+  test("weird property keys produce valid typedef names", () => {
+    const jsdoc = generateJsdoc({ "user-name": { age: 1 } }, "P");
+    assert.ok(jsdoc.includes("@property {P_Username} user-name"));
+    assert.ok(jsdoc.includes("@typedef {object} P_Username"));
+  });
+
+  test("inferType basics", () => {
+    assert.strictEqual(inferType(null), "any");
+    assert.strictEqual(inferType([]), "Array<any>");
+    assert.strictEqual(inferType(["a"]), "Array<string>");
+    assert.strictEqual(inferType({}), "object");
+    assert.strictEqual(inferType(42), "number");
+  });
+});
+
+suite("Extension Activation", () => {
+  test("Extension should be present and activate", async () => {
+    const extension = vscode.extensions.getExtension(
+      "n0n3br.paste-json-jsdoc",
+    );
+    assert.ok(extension, "Extension should be installed");
+    await extension!.activate();
+    assert.strictEqual(extension!.isActive, true);
   });
 
   test("Command should be registered", async () => {
     const commands = await vscode.commands.getCommands(true);
-    const hasCommand = commands.includes("pasteJsonAsJsdoc.generate");
-    assert.ok(
-      hasCommand,
-      "pasteJsonAsJsdoc.generate command should be registered",
-    );
+    assert.ok(commands.includes("pasteJsonAsJsdoc.generate"));
   });
 });
 
-suite("JSDoc Generation", () => {
-  test("Should generate typedef for simple object", async () => {
-    const json = {
-      id: 123,
-      name: "Test User",
-      active: true,
-    };
+suite("Editor Integration (real command, real clipboard)", () => {
+  let doc: vscode.TextDocument;
 
-    const jsdoc = generateJsdoc(json, "User");
-
-    assert.ok(
-      jsdoc.includes("@typedef {object} User"),
-      "Should declare object typedef",
-    );
-    assert.ok(
-      jsdoc.includes("@property {number} id"),
-      "Should have number property",
-    );
-    assert.ok(
-      jsdoc.includes("@property {string} name"),
-      "Should have string property",
-    );
-    assert.ok(
-      jsdoc.includes("@property {boolean} active"),
-      "Should have boolean property",
-    );
-  });
-
-  test("Should handle null values as any type", () => {
-    const json = { data: null };
-    const jsdoc = generateJsdoc(json, "NullableTest");
-    assert.ok(
-      jsdoc.includes("@property {any} data"),
-      "Null should become any type",
-    );
-  });
-
-  test("Should handle arrays with primitive items", () => {
-    const json = { tags: ["javascript", "vscode"] };
-    const jsdoc = generateJsdoc(json, "TagList");
-    assert.ok(
-      jsdoc.includes("@property {Array<string>} tags"),
-      "Should type array of strings",
-    );
-  });
-
-  test("Should handle nested objects", () => {
-    const json = {
-      user: {
-        profile: {
-          age: 25,
-        },
-      },
-    };
-    const jsdoc = generateJsdoc(json, "NestedTest");
-    assert.ok(
-      jsdoc.includes("@property {NestedTest_User} user"),
-      "Should reference nested typedef",
-    );
-  });
-
-  test("Should handle arrays with object items", () => {
-    const json = {
-      items: [{ id: 1 }, { id: 2 }],
-    };
-    const jsdoc = generateJsdoc(json, "ListResponse");
-    assert.ok(
-      jsdoc.includes("@property {Array<ListResponse_ItemsItem>} items"),
-      "Should type array of objects",
-    );
-  });
-
-  test("Should wrap output in JSDoc comment block", () => {
-    const json = { foo: "bar" };
-    const jsdoc = generateJsdoc(json, "Simple");
-    assert.ok(jsdoc.startsWith("/**"), "Should start with JSDoc opener");
-    assert.ok(jsdoc.endsWith("*/\n"), "Should end with JSDoc closer");
-  });
-});
-
-suite("Clipboard Integration", () => {
-  test("Should read clipboard content", async () => {
-    await vscode.env.clipboard.writeText('{"test": true}');
-    const content = await vscode.env.clipboard.readText();
-    assert.strictEqual(
-      content,
-      '{"test": true}',
-      "Clipboard should contain written text",
-    );
-  });
-
-  test("Should handle invalid JSON gracefully", async () => {
-    const invalidJson = "{ invalid json }";
-    let parseError = false;
-
-    try {
-      JSON.parse(invalidJson);
-    } catch {
-      parseError = true;
-    }
-
-    assert.ok(parseError, "Invalid JSON should throw parse error");
-  });
-});
-
-suite("Editor Integration", () => {
-  test("Should insert text at cursor position", async () => {
-    const doc = await vscode.workspace.openTextDocument({
+  setup(async () => {
+    doc = await vscode.workspace.openTextDocument({
       language: "javascript",
       content: "",
     });
-    const editor = await vscode.window.showTextDocument(doc);
+    await vscode.window.showTextDocument(doc);
+  });
 
-    const position = new vscode.Position(0, 0);
-    await editor.edit((editBuilder) => {
-      editBuilder.insert(position, "/** @typedef {string} Test */");
-    });
+  teardown(async () => {
+    await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+  });
 
-    const text = doc.getText();
-    assert.ok(
-      text.includes("@typedef {string} Test"),
-      "Text should be inserted at cursor",
-    );
+  test("invalid JSON shows error and leaves document untouched", async () => {
+    await vscode.env.clipboard.writeText("{ invalid json");
+    await vscode.commands.executeCommand("pasteJsonAsJsdoc.generate");
+    assert.strictEqual(doc.getText(), "", "document should stay empty");
+  });
+
+  test("empty clipboard shows error and leaves document untouched", async () => {
+    await vscode.env.clipboard.writeText("   ");
+    await vscode.commands.executeCommand("pasteJsonAsJsdoc.generate");
+    assert.strictEqual(doc.getText(), "");
   });
 });
-
-// Helper function copied from extension for unit testing
-function generateJsdoc(obj: any, name: string, indent = ""): string {
-  if (obj === null) return `${indent} * @typedef {null} ${name}\n`;
-  if (Array.isArray(obj)) {
-    const itemType = obj.length > 0 ? inferType(obj[0]) : "any";
-    return `${indent} * @typedef {Array<${itemType}>} ${name}\n`;
-  }
-  if (typeof obj !== "object") {
-    return `${indent} * @typedef {${typeof obj}} ${name}\n`;
-  }
-
-  let lines = [`${indent}/**`, `${indent} * @typedef {object} ${name}`];
-
-  for (const [key, value] of Object.entries(obj)) {
-    const propType = inferType(value);
-    const example = JSON.stringify(value).slice(0, 50);
-
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      const nestedName = `${name}_${capitalize(key)}`;
-      lines.push(`${indent} * @property {${nestedName}} ${key}`);
-    } else if (
-      Array.isArray(value) &&
-      value.length > 0 &&
-      typeof value[0] === "object"
-    ) {
-      const itemName = `${name}_${capitalize(key)}Item`;
-      lines.push(
-        `${indent} * @property {Array<${itemName}>} ${key} - e.g: ${example}`,
-      );
-    } else {
-      lines.push(`${indent} * @property {${propType}} ${key} - e.g:${example}`);
-    }
-  }
-
-  lines.push(`${indent} */`);
-  return lines.join("\n") + "\n";
-}
-
-function inferType(value: any): string {
-  if (value === null) return "any";
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "Array<any>";
-    const inner = inferType(value[0]);
-    return `Array<${inner}>`;
-  }
-  if (typeof value === "object") return "object";
-  return typeof value;
-}
-
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}

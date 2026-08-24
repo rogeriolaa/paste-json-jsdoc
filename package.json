@@ -3,7 +3,7 @@
   "displayName": "paste-json-jsdoc",
   "publisher": "n0n3br",
   "description": "Paste raw JSON and instantly turn it into clean JSDoc @typedef definitions inside VS Code. This extension helps JavaScript developers generate reusable type annotations from API responses, config objects, or sample payloads without writing JSDoc by hand.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.116.0"
@@ -13,7 +13,9 @@
     "url": "https://github.com/rogeriolaa/paste-json-jsdoc"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Linters",
+    "Formatters"
   ],
   "keybindings": [
     {
@@ -58,5 +60,14 @@
     "typescript": "^5.9.3",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2"
-  }
+  },
+  "keywords": [
+    "json",
+    "jsdoc",
+    "typedef",
+    "types",
+    "clipboard",
+    "documentation",
+    "intellisense"
+  ]
 }

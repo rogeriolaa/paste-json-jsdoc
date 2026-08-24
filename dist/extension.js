@@ -1,6 +1,161 @@
-"use strict";var u=Object.create;var p=Object.defineProperty;var l=Object.getOwnPropertyDescriptor;var g=Object.getOwnPropertyNames;var w=Object.getPrototypeOf,h=Object.prototype.hasOwnProperty;var A=(e,t)=>{for(var r in t)p(e,r,{get:t[r],enumerable:!0})},d=(e,t,r,s)=>{if(t&&typeof t=="object"||typeof t=="function")for(let o of g(t))!h.call(e,o)&&o!==r&&p(e,o,{get:()=>t[o],enumerable:!(s=l(t,o))||s.enumerable});return e};var m=(e,t,r)=>(r=e!=null?u(w(e)):{},d(t||!e||!e.__esModule?p(r,"default",{value:e,enumerable:!0}):r,e)),v=e=>d(p({},"__esModule",{value:!0}),e);var b={};A(b,{activate:()=>x});module.exports=v(b);var i=m(require("vscode"));function x(e){let t=i.commands.registerCommand("pasteJsonAsJsdoc.generate",async()=>{let r=i.window.activeTextEditor;if(!r){i.window.showErrorMessage("No active editor");return}let s=await i.env.clipboard.readText();if(!s.trim()){i.window.showErrorMessage("Clipboard is empty");return}let o;try{o=JSON.parse(s)}catch{i.window.showErrorMessage("Invalid JSON in clipboard");return}let n=await i.window.showInputBox({prompt:"Enter the typedef name",placeHolder:"e.g., IApiResponse"});if(!n)return;let a=N(o,n);r.edit(c=>{c.insert(r.selection.active,a)})});e.subscriptions.push(t)}function N(e,t,r=""){if(e===null)return`${r} * @typedef {null} ${t}
-`;if(Array.isArray(e)){let o=e.length>0?f(e[0]):"any";return`${r} * @typedef {Array<${o}>} ${t}
-`}if(typeof e!="object")return`${r} * @typedef {${typeof e}} ${t}
-`;let s=[`${r}/**`,`${r} * @typedef {object} ${t}`];for(let[o,n]of Object.entries(e)){let a=f(n),c=JSON.stringify(n).slice(0,50);if(n!==null&&typeof n=="object"&&!Array.isArray(n)){let y=`${t}_${$(o)}`;s.push(`${r} * @property {${y}} ${o}`)}else if(Array.isArray(n)&&n.length>0&&typeof n[0]=="object"){let y=`${t}_${$(o)}Item`;s.push(`${r} * @property {Array<${y}>} ${o} - e.g: ${c}`)}else s.push(`${r} * @property {${a}} ${o} - e.g:${c}`)}return s.push(`${r} */`),s.join(`
-`)+`
-`}function f(e){return e===null?"any":Array.isArray(e)?e.length===0?"Array<any>":`Array<${f(e[0])}>`:typeof e=="object"?"object":typeof e}function $(e){return e.charAt(0).toUpperCase()+e.slice(1)}0&&(module.exports={activate});
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/extension.ts
+var extension_exports = {};
+__export(extension_exports, {
+  activate: () => activate,
+  deactivate: () => deactivate
+});
+module.exports = __toCommonJS(extension_exports);
+var vscode = __toESM(require("vscode"));
+
+// src/generator.ts
+function generateJsdoc(obj, name, indent = "") {
+  const defs = [];
+  const root = emitTypedef(obj, name, indent, defs);
+  return defs.join("\n") + "\n";
+}
+function emitTypedef(value, name, indent, defs) {
+  if (value === null) {
+    defs.push(`${indent} * @typedef {any} ${name}`);
+    return `${indent} * @typedef {any} ${name}`;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      const def2 = `${indent} * @typedef {Array<any>} ${name}`;
+      defs.push(def2);
+      return def2;
+    }
+    const itemName = `${name}Item`;
+    emitTypedef(value[0], itemName, indent, defs);
+    const def = `${indent} * @typedef {Array<${itemName}>} ${name}`;
+    defs.push(def);
+    return def;
+  }
+  if (typeof value !== "object") {
+    const def = `${indent} * @typedef {${typeof value}} ${name}`;
+    defs.push(def);
+    return def;
+  }
+  const lines = [`${indent}/**`, `${indent} * @typedef {object} ${name}`];
+  for (const [key, propValue] of Object.entries(value)) {
+    if (propValue !== null && typeof propValue === "object" && !Array.isArray(propValue)) {
+      const nestedName = `${name}_${sanitize(key)}`;
+      lines.push(`${indent} * @property {${nestedName}} ${key}`);
+      emitTypedef(propValue, nestedName, indent, defs);
+    } else if (Array.isArray(propValue) && propValue.length > 0 && typeof propValue[0] === "object") {
+      const itemName = `${name}_${sanitize(key)}Item`;
+      lines.push(
+        `${indent} * @property {Array<${itemName}>} ${key}`
+      );
+      emitTypedef(propValue[0], itemName, indent, defs);
+    } else {
+      const example = JSON.stringify(propValue)?.slice(0, 50) ?? "";
+      lines.push(
+        `${indent} * @property {${inferType(propValue)}} ${key} - e.g:${example}`
+      );
+    }
+  }
+  lines.push(`${indent} */`);
+  defs.unshift(lines.join("\n"));
+  return "";
+}
+function inferType(value) {
+  if (value === null) {
+    return "any";
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return "Array<any>";
+    }
+    return `Array<${inferType(value[0])}>`;
+  }
+  if (typeof value === "object") {
+    return "object";
+  }
+  return typeof value;
+}
+function sanitize(key) {
+  const clean = key.replace(/[^a-zA-Z0-9]/g, "");
+  return capitalize(clean.length > 0 ? clean : "Prop");
+}
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// src/extension.ts
+function activate(context) {
+  const disposable = vscode.commands.registerCommand(
+    "pasteJsonAsJsdoc.generate",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showErrorMessage("No active editor");
+        return;
+      }
+      const jsonText = await vscode.env.clipboard.readText();
+      if (!jsonText.trim()) {
+        vscode.window.showErrorMessage("Clipboard is empty");
+        return;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch {
+        vscode.window.showErrorMessage("Invalid JSON in clipboard");
+        return;
+      }
+      const typeName = await vscode.window.showInputBox({
+        prompt: "Enter the typedef name",
+        placeHolder: "e.g., IApiResponse"
+      });
+      if (!typeName) {
+        return;
+      }
+      const jsdoc = generateJsdoc(parsed, sanitizeTypeName(typeName));
+      await editor.edit((editBuilder) => {
+        editBuilder.insert(editor.selection.active, jsdoc);
+      });
+    }
+  );
+  context.subscriptions.push(disposable);
+}
+function sanitizeTypeName(name) {
+  const clean = name.trim().replace(/[^a-zA-Z0-9_$]/g, "");
+  return clean.length > 0 ? clean : "GeneratedType";
+}
+function deactivate() {
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  activate,
+  deactivate
+});
+//# sourceMappingURL=extension.js.map
